@@ -1,8 +1,8 @@
 # autoEnum, an automatic enumeration tool
 
-Heavily inspired by [autoNmap](../autoNmap/README.md), this tool goes far beyond `Nmap` enumeration.
+Heavily inspired by [autoNmap](https://github.com/0x5ubt13/myToolkit/tree/main/autoNmap), this tool goes far beyond `Nmap` enumeration.
 
-In many external infra jobs (and practice labs), I found myself using `autoNmap` and the same extra enumeration tools afterwards over and over, so I came up with the idea of including these extra enumeration tools to the already nice functionality of `autoNmap`, so we could consider `autoEnum` as an **"autoNmap on steroids"**
+In many external infra jobs, practice labs, and some boot2root CTFs, I found myself using `autoNmap` and the same extra enumeration tools afterwards over and over, so I came up with the idea of including these extra enumeration tools to the already nice functionality of `autoNmap`, so we could consider `autoEnum` as an **"autoNmap on steroids"**
 
 Pass either a single IP address or a targets file to it and will first get the ports open on each host, then will concurrently launch tools appropriate for every open well-known port. These will start working on the background, so allow a few moments for them to run completely. You will get a notification on your terminal when each of them are done.
 
@@ -99,6 +99,17 @@ chmod +x mytoolkit/autoEnum/autoEnum
 cd mytoolkit/autoEnum/
 ./install_requisites.sh
 ~~~
+
+## Why Bash, and the 'Slow' flag
+The way this script works is it first sweeps all open TCP ports, then sweeps some hard-coded UDP ports, and only then, launches the global `Nmap` attack and parses all open ports.
+
+This is clearly the bottleneck of the script, accounting pretty much for the 95% of its running time, and the reason why Bash was chosen over Python or Golang: there's not much point in trying to speed it up if it's going to depend upon the port sweeping to do the logic afterwards anyway.
+
+This is the reason why there are many experiments in the `ports_sweep()` function (TODO: insert line number once the script is finished). `Rustscan` is suggested to be installed in the ![install_requisites.sh](./install_requisites.sh) script, but this can sometimes be detrimental as it runs so fast that sometimes, inevitably, it misses open ports.
+
+I have seen the script being run with `Rustscan` to be done in about 10 to 20 seconds (per host), and maybe miss an important port. In the other hand, I have seen the ports sweep being performed with `Nmap` with the slow flag (-s) being done in about 60 to 100 seconds (per host); that is a massive time increase, but not missing any port (the overwhelming majority of times).
+
+In jobs that would normally use VA scanners like `Nessus`, a minute of your time is not really a big issue as those scanners take ages to cover the targets properly, so I would suggest that if you have time, let the script run with the slow flag to ensure coverage is adequate. Otherwise, if you like to risk it a bit and want to play around with the script, the default mode is at full tilt for fun and still covers the majority of ports!
 
 ## To Do
 
