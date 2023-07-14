@@ -105,7 +105,7 @@ The way this script works is it first sweeps all open TCP ports, then sweeps som
 
 This is clearly the bottleneck of the script, accounting pretty much for the 95% of its running time, and the reason why Bash was chosen over Python or Golang: there's not much point in trying to speed it up if it's going to depend upon the port sweeping to do the logic afterwards anyway.
 
-This is the reason why there are many experiments in the `ports_sweep()` function (TODO: insert line number once the script is finished). `Rustscan` is suggested to be installed in the ![install_requisites.sh](./install_requisites.sh) script, but this can sometimes be detrimental as it runs so fast that sometimes, inevitably, it misses open ports.
+This is the reason why there are many experiments in the `ports_sweep()` function (TODO: insert line number once the script is finished). `Rustscan` is suggested to be installed in the [install_requisites.sh](./install_requisites.sh) script, but this can sometimes be detrimental as it runs so fast that sometimes, inevitably, it misses open ports.
 
 I have seen the script being run with `Rustscan` to be done in about 10 to 20 seconds (per host), and maybe miss an important port. In the other hand, I have seen the ports sweep being performed with `Nmap` with the slow flag (-s) being done in about 60 to 100 seconds (per host); that is a massive time increase, but not missing any port (the overwhelming majority of times).
 
