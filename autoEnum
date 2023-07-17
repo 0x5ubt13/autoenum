@@ -589,7 +589,7 @@ ports_iterator() {
     
         running_tool "enum4linux"
         enum4linux -u '' -p '' "${1}" >> "${nb_smb_dir}enum4linux_anon.out" 2>&1 && \
-          finished_tool "enum4linux" "${1}" "${nb_smb_dir}enum4linux_anon.out" & 
+          finished_tool "enum4linux" "${1}" "-R ${nb_smb_dir}enum4linux_anon.out" & 
 
         running_tool "Nmap scripts for NB/SMB"
         nmap -Pn -sUV -p137 -n -sVC --script "nbstat.nse" "${1}" -v >> "${nb_smb_dir}nb_enum.nmap" 2>&1 &&
