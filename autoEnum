@@ -845,8 +845,8 @@ main() {
     # Iterate over each port in the array
     ports_iterator "${IP}" "${dir}" ## TODO: convert ports_iterator to POSIX
   else # ---------- Multi-target: ----------
-    printf "%b[+] Using %b'%s'%b as targets file\n" "${GREEN}" "${RESTORE}" "${IP}" "${GREEN}" 
-    printf "[+] Successfully identified %b'%s'%b targets in the file\n" "${RESTORE}" "${list_total_lines}" "${GREEN}"
+    # TODO: test thoroughly
+    printf "%b[+] Using %b'%s'%b as targets file\n[+] Successfully identified %b'%s'%b targets in the file\n" "${GREEN}" "${RESTORE}" "${IP}" "${GREEN}" "${RESTORE}" "${list_total_lines}" "${GREEN}"
 
     # loop through the targets and assign vars accordingly
     line=1
@@ -854,10 +854,7 @@ main() {
     while [ "$line" -le "$list_total_lines" ]; do
       target=$(sed "${line}q;d" "$IP" 2>/dev/null)
       # target_number="_target_${line}"
-      dir="$(pwd)/nmap/${target}/"
-  
-      # Colouring red to catch mkdir's File exists error
-      printf "%b" "${RED}"; mkdir "${dir}"; printf "%b" "${RESTORE}"
+      dir="${DIR}${target}/"; custom_mkdir "${dir}"
       
       # More info to console
       printf "%b[+] Attacking target '%b%s%b/%b%s%b': '%b%s%b'. " "${GREEN}" "${RESTORE}" "${line}" "${GREEN}" "${RESTORE}" "$list_total_lines" "${GREEN}" "${RESTORE}" "$target" "${GREEN}"
@@ -868,17 +865,17 @@ main() {
       answers_icmp "$target"
   
       # Do port discovery scan
-      ports_sweep "$target"
+      ports_sweep "$target" "$dir"
       
       # Abort tests if no ports were found open
       if [ "$sweep_result" -eq 1 ]; then 
         printf "%b[-] No open ports were found in %s, aborting all scans for this target\n%b" "${RED}" "${target}" "${RESTORE}"
       else
         # Proceed with nmap scan and ports iterator
-        all_ports_vuln_scan "$target"
+        all_ports_vuln_scan "$target" "$dir"
 
         # Iterate over each port in the array
-        ports_iterator "$target" ## TODO: convert ports_iterator to POSIX
+        ports_iterator "$target" "$dir" ## TODO: convert ports_iterator to POSIX
       fi
 
       # Loop counter
@@ -937,7 +934,7 @@ custom_mkdir "${DIR}"
 updatedb_check=$(which updatedb)
 # TODO: Remove this requisite for the containerised version of the script
 if [ -z "$updatedb_check" ]; then
-  error_msg "AutoEnum needs \"locate\" to be installed. Please see or run \"install_requisites.sh\", or manually install \"locate\""
+  error_msg 'AutoEnum needs "locate" to be installed. Please see or run "install_requisites.sh", or manually install "locate"'
 fi
 
 printf "%b[+] Using '%b%s%b' as base directory where to save the output files%b\n" "${GREEN}" "${RESTORE}" "${DIR}" "${GREEN}" "${RESTORE}"
