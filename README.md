@@ -45,13 +45,14 @@ Examples:
 	autoenum -t targets_file.txt -r 10.10.8.0/24 
 ~~~
 
-## 29 wrapped tools currently present
+## 30 wrapped tools currently present
 
 - Braa
 - CeWL
 - CrackMapExec
 - Enum4linux
 - Ffuf
+- Fping
 - Gobuster
 - Hydra
 - Ident-user-enum

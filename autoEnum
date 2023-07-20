@@ -8,7 +8,6 @@ YELLOW="\033[33m"
 BLUE="\033[34m"
 START="$(date +%s)" # Timing the execution
 
-
 # ---------- Optional Arguments ----------
 
 # Defaults:
@@ -397,6 +396,10 @@ cidr_enumeration() {
     running_tool "onesixtyone"
     onesixtyone -c "$(locate "SNMP/snmp.txt" -l 1)" "$cidr" -w 100 >> "${cidr_dir}"onesixtyone.out 2>&1 && \
       finished_tool "onesixtyone" "$cidr" "${cidr_dir}onesixtyone.out" &
+
+    running_tool "fping"
+    fping -asgq "$cidr" >> "${cidr_dir}"fping.out 2>&1 && \
+      finished_tool "fping" "$cidr" "${cidr_dir}fping.out" &
   else
     printf "%b[!] CIDR range %bNOT%b detected. Remember you can also pass a range in CIDR notation to use enum tools that scan a wide range with '%bautoenum -r <IP address>/<network mask>%b'%b\n" "${YELLOW}" "${RED}" "${YELLOW}" "${BLUE}" "${YELLOW}" "${RESTORE}" 
   fi
