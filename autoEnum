@@ -12,7 +12,7 @@ START="$(date +%s)" # Timing the execution
 # ---------- Optional Arguments ----------
 
 # Defaults:
-dnsServers=""
+dnsServers="-n"
 do_help=""
 verbose=1
 slower=0
@@ -75,7 +75,7 @@ answers_icmp() {
   # If ping is not returned within a second, then ping scan is disabled with -Pn
   ping_test="$(ping -c 1 -W 1 "$1" 2>/dev/null | grep ttl)"
   if [ -z "${ping_test}" ]; then
-    printf "%b[-]%b Ping against %b'%s'%b %bnot possible%b, please make sure your target IP address is correct. Assuming host is up, using -Pn flag for the full scan.%b\n" "${RED}" "${YELLOW}" "${RESTORE}" "$IP" "${YELLOW}" "${RED}" "${YELLOW}" "${RESTORE}"
+    printf "%b[-]%b Ping against %b'%s'%b %bnot possible%b, please make sure your target IP address is correct. Assuming host is up, using -Pn flag for the full scan.%b\n" "${RED}" "${YELLOW}" "${RESTORE}" "$1" "${YELLOW}" "${RED}" "${YELLOW}" "${RESTORE}"
     ping="-Pn"
   else
     ping=""
@@ -139,15 +139,71 @@ print_phase() {
   1)
     printf "%s%b%s" "1" "${RESTORE}" ": parsing the CIDR range ";;
   2)
-    printf "%s%b%s" "2" "${RESTORE}" ": parsing target or list ";;
+    printf "%s%b%s" "2" "${RESTORE}" ": parsing target or targets list ";;
   3)
     printf "%s%b%s" "3" "${RESTORE}" ": parsing found ports ";;
+  33)
+    printf "%s%b%s" "3" "${RESTORE}" ": running multi-target mode. Looping through the list, one target at a time ";;
   4)
     printf "%s%b%s" "4" "${RESTORE}" ": background tools working ";;
   *)
     error_msg "Development error. There are currently 5 phases in the script ";;
   esac
   printf "%b%s%b\n\n" "${BLUE}" "----------" "${RESTORE}"
+}
+
+checks() {
+  # Check 0: Launch fancy (Bruce) Banner! 
+  if [ "$verbose" -eq 1 ]; then print_hulk; print_phase 0; fi # Ba-dum-tss!
+  
+  # Check 1: help flag passed?
+  if [ -n "$do_help" ]; then
+    if [ "$verbose" -eq 1 ]; then printf "%b[*] Help flag detected. Aborting other checks and printing usage.\n%b" "${BLUE}" "${RESTORE}"; fi
+    usage
+  fi
+  
+  # Check 2: am I groot?!
+  if [ "$EUID" -ne 0 ]; then
+    error_msg "Please run me as root!"
+  fi
+  
+  # Check 3: Ensure there is a target
+  if [[ -n "$ip" ]]; then
+    IP="$ip"
+  else
+    error_msg "You must provide an IP address or targets file with the flag -t to start the attack."
+  fi
+  
+  # Check 4: Determine whether it is a single target or multi-target
+  if [[ ! -f "$IP" ]]; then # Single target
+    # Ensure $IP is either an IP or a URL
+    if ! expr "${IP}" : "\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\)" >/dev/null && \
+       ! expr "${IP}" : "\(\([[:alnum:]-]\{1,63\}\.\)*[[:alpha:]]\{2,6\}\)" >/dev/null; then
+        error_msg "Invalid IP or URL!"
+    fi
+  else
+    # Multi-target, check how many targets are there
+    list_total_lines=$(wc -l "$IP" | awk '{ print $1 }')
+  fi
+  
+  # Check 5: Ensure base output directory is correctly set and exists
+  ## TODO: create option to set custom directory if launched autonomously outside Docker
+  if test "$(pwd)" = "/"; then
+    DIR="/autoEnum_output/"
+  else
+    DIR="$(pwd)/autoEnum_output/"
+  fi
+  
+  custom_mkdir "${DIR}"
+  
+  # Check 6: locate exists in the system
+  updatedb_check=$(which updatedb)
+  # TODO: Remove this requisite for the containerised version of the script
+  if [ -z "$updatedb_check" ]; then
+    error_msg 'AutoEnum needs "locate" to be installed. Please see or run "install_requisites.sh", or manually install "locate"'
+  fi
+  
+  printf "%b[+] Using '%b%s%b' as base directory where to save the output files%b\n" "${GREEN}" "${RESTORE}" "${DIR}" "${GREEN}" "${RESTORE}"
 }
 
 print_hulk() {
@@ -159,7 +215,6 @@ print_hulk() {
 %b\__,_/ \\__,_/ \\__/ \\____/%b/_____/ /_/ /_/\\__,_/ /_/ /_/ /_/ 
 %b                    by 0x5ubt13                               \n%b                                            
 " "${YELLOW}" "${RED}" "${YELLOW}" "${RED}" "${YELLOW}" "${RED}" "${YELLOW}" "${RED}" "${YELLOW}" "${RED}" "${GREEN}" "${RESTORE}"
-
 }
 
 # ---------- Enumeration Funcions ----------
@@ -167,7 +222,7 @@ print_hulk() {
 # Quickly scan all TCP ports and save them to $ports
 ports_sweep() {
   # First arg target IP, second arg dir
-  if [ -n "$dnsServers" ]; then
+  if [ ! "$dnsServers" = "-n" ]; then
     # Nmap ports sweep with --dns-servers
     if [ "$verbose" -eq 1 ]; then 
       printf "%b[+]%b -d%b flag detected. Running nmap port sweep with custom DNS servers: %s .%b\n" "${GREEN}" "${YELLOW}" "${GREEN}" "${dnsServers}" "${RESTORE}"
@@ -184,7 +239,6 @@ ports_sweep() {
         ports=$(nmap --min-rate=2000 "$dnsServers" -sS -p- -T4 "$ping" "$1" 2>/dev/null | grep "^[0-9]" | cut -d "/" -f 1 | tr "\n" "," | sed "s/,$//")
     fi
   else
-    dnsServers="-n"
     if [ -n "$top" ]; then
       # Nmap ports sweep with --top-ports=<${top}>
       if [ "$verbose" -eq 1 ]; then 
@@ -819,10 +873,10 @@ main() {
   # Perform CIDR enumeration first, check if CIDR argument was passed
   cidr_enumeration "${DIR}"
   
-  if [ "$verbose" -eq 1 ]; then print_phase 2; fi
   # Check whether input is a single or multiple target and loop accordingly
-  if [[ ! -f "$IP" ]]; then 
-    # ---------- Single target ----------
+  if [[ ! -f "$IP" ]]; then # ---------- Single target ----------
+    if [ "$verbose" -eq 1 ]; then print_phase 2; fi
+
     dir="${DIR}${IP}/"; custom_mkdir "${dir}"
     printf "%b[+] Using '%b%s%b' as single target IP and '%b%s%b' for all the tools output%b\n" "${GREEN}" "${RESTORE}" "${IP}" "${GREEN}" "${RESTORE}" "${dir}" "${GREEN}" "${RESTORE}"
 
@@ -846,18 +900,22 @@ main() {
     ports_iterator "${IP}" "${dir}" ## TODO: convert ports_iterator to POSIX
   else # ---------- Multi-target: ----------
     # TODO: test thoroughly
+    if [ "$verbose" -eq 1 ]; then print_phase 2; fi
     printf "%b[+] Using %b'%s'%b as targets file\n[+] Successfully identified %b'%s'%b targets in the file\n" "${GREEN}" "${RESTORE}" "${IP}" "${GREEN}" "${RESTORE}" "${list_total_lines}" "${GREEN}"
 
+    if [ "$verbose" -eq 1 ]; then print_phase 33; fi
+    
     # loop through the targets and assign vars accordingly
     line=1
-    if [ "$verbose" -eq 1 ]; then print_phase 3; fi
+    if [ "$verbose" -eq 1 ]; then printf ""; fi
     while [ "$line" -le "$list_total_lines" ]; do
       target=$(sed "${line}q;d" "$IP" 2>/dev/null)
+      printf "%b[DEBUG] Using target %s%b\n" "${BLUE}" "$(sed "${line}q;d" "$IP")" "${RESTORE}"
       # target_number="_target_${line}"
       dir="${DIR}${target}/"; custom_mkdir "${dir}"
       
       # More info to console
-      printf "%b[+] Attacking target '%b%s%b/%b%s%b': '%b%s%b'. " "${GREEN}" "${RESTORE}" "${line}" "${GREEN}" "${RESTORE}" "$list_total_lines" "${GREEN}" "${RESTORE}" "$target" "${GREEN}"
+      printf "%b[+] Attacking target '%b%s%b/%b%s%b': '%b%s%b'.\n" "${GREEN}" "${RESTORE}" "${line}" "${GREEN}" "${RESTORE}" "$list_total_lines" "${GREEN}" "${RESTORE}" "$target" "${GREEN}"
       printf "%b[+] Using '%b%s%b' for all this target's tools output%b\n" "${GREEN}" "${RESTORE}" "${dir}" "${GREEN}" "${RESTORE}" 
   
       # TCP Scans
@@ -884,61 +942,11 @@ main() {
   fi
 }
 
+# ---------- End of function declarations ----------
 
 # ---------- Script checks, ensuring everything is ready to run ----------
 
-# Check 0: Launch fancy (Bruce) Banner! 
-if [ "$verbose" -eq 1 ]; then print_hulk; print_phase 0; fi # Ba-dum-tss!
-
-# Check 1: help flag passed?
-if [ -n "$do_help" ]; then
-  if [ "$verbose" -eq 1 ]; then printf "%b[*] Help flag detected. Aborting other checks and printing usage.\n%b" "${BLUE}" "${RESTORE}"; fi
-  usage
-fi
-
-# Check 2: am I groot?!
-if [ "$EUID" -ne 0 ]; then
-  error_msg "Please run me as root!"
-fi
-
-# Check 3: Ensure there is a target
-if [[ -n "$ip" ]]; then
-  IP="$ip"
-else
-  error_msg "You must provide an IP address or targets file with the flag -t to start the attack."
-fi
-
-# Check 4: Determine whether it is a single target or multi-target
-if [[ ! -f "$IP" ]]; then # Single target
-  # Ensure $IP is either an IP or a URL
-  if ! expr "${IP}" : "\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\)" >/dev/null && \
-     ! expr "${IP}" : "\(\([[:alnum:]-]\{1,63\}\.\)*[[:alpha:]]\{2,6\}\)" >/dev/null; then
-      error_msg "Invalid IP or URL!"
-  fi
-else
-  # Multi-target, check how many targets are there
-  list_total_lines=$(wc -l "$IP" | awk '{ print $1 }')
-fi
-
-# Check 5: Ensure base output directory is correctly set and exists
-## TODO: create option to set custom directory if launched autonomously outside Docker
-if test "$(pwd)" = "/"; then
-  DIR="/autoEnum_output/"
-else
-  DIR="$(pwd)/autoEnum_output/"
-fi
-
-custom_mkdir "${DIR}"
-
-# Check 6: locate exists in the system
-updatedb_check=$(which updatedb)
-# TODO: Remove this requisite for the containerised version of the script
-if [ -z "$updatedb_check" ]; then
-  error_msg 'AutoEnum needs "locate" to be installed. Please see or run "install_requisites.sh", or manually install "locate"'
-fi
-
-printf "%b[+] Using '%b%s%b' as base directory where to save the output files%b\n" "${GREEN}" "${RESTORE}" "${DIR}" "${GREEN}" "${RESTORE}"
-
+checks
 
 # ---------- Preliminary checks completed. Starting engines! Calling main function ----------
 
