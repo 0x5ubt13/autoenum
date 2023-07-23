@@ -803,7 +803,7 @@ ports_iterator() {
           grep "/" < "${nfs_dir}"showmount.out | cut -d " " -f1 | while IFS= read -r dir_to_mount
           do
             custom_mkdir "${nfs_dir}mounted_NFS_contents/${dir_to_mount}/"
-            mount -t nfs "${1}":/"${dir_to_mount}" "${nfs_dir}"mounted_NFS_contents/ -o nolock
+            mount -t nfs "${1}":/"${dir_to_mount}" "${nfs_dir}"mounted_NFS_contents/ -o nolock,vers=3,tcp,timeo=300 # TODO: check these mount options work fine
           done && \
           tree "${nfs_dir}"mounted_NFS_contents/ >> "${nfs_dir}nfs_mounts.tree" 2>&1 && \
           finished_tool "Showmount + mount" "${1}" "${nfs_dir}showmount.out && cat ${nfs_dir}nfs_mounts.tree" && \
