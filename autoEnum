@@ -138,7 +138,7 @@ print_phase() {
   1)
     printf "%s%b%s" "1" "${RESTORE}" ": parsing the CIDR range ";;
   2)
-    printf "%s%b%s" "2" "${RESTORE}" ": parsing target or targets list ";;
+    printf "%s%b%s" "2" "${RESTORE}" ": parsing target or list of targets ";;
   3)
     printf "%s%b%s" "3" "${RESTORE}" ": parsing found ports ";;
   33)
@@ -220,6 +220,7 @@ print_hulk() {
 
 # Quickly scan all TCP ports and save them to $ports
 ports_sweep() {
+  ports="" # Reset ports var in case it was used for multi-target, to avoid corruption
   # First arg target IP, second arg dir
   if [ ! "$dnsServers" = "-n" ]; then
     # Nmap ports sweep with --dns-servers
@@ -256,7 +257,7 @@ ports_sweep() {
         if [ -n "$rustscan_check" ]; then
           # Rustscan ports sweep
           printf "%b[+] %bRustscan%b found, proceeding to sweep ports with Rustscan%b\n" "${GREEN}" "${BLUE}" "${GREEN}" "${RESTORE}"
-          if [ "$verbose" -eq 1 ]; then printf "\n%b[!] Starting %bRustscan's%b SYN port discovery scan against %b'%s'%b, please bear with...\n" "${YELLOW}" "${BLUE}" "${YELLOW}" "${RESTORE}" "$1" "${YELLOW}"; fi
+          if [ "$verbose" -eq 1 ]; then printf "\n%b[!] Starting %bRustscan's%b SYN port discovery scan against %b'%s'%b, please bear with...\n%b" "${YELLOW}" "${BLUE}" "${YELLOW}" "${RESTORE}" "$1" "${YELLOW}" "${RESTORE}"; fi
           ports="$(rustscan -a "$IP" "$dnsServers" --ulimit 5000 -g | cut -d ' ' -f 3 | sed 's/[^[:alnum:],\t]//g')"
         else
           # Nmap ports sweep
@@ -270,7 +271,8 @@ ports_sweep() {
   
   # Add and merge to ports an UDP scan.
   # TODO: only currently supporting the scan of SNMP and IPMI. More to add, dependant on how much time scanning UDP will consume
-  ports="$ports","$(nmap --min-rate=2000 -sU -p161,162,10161,10162,623 -T5 --open "$ping" "$1" 2>/dev/null | grep "open " | grep "^[0-9]" | cut -d "/" -f 1 | tr "\n" "," | sed "s/,$//")"
+  udp_ports="$(nmap --min-rate=2000 -sU -p161,162,10161,10162,623 -T5 --open "$ping" "$1" 2>/dev/null | grep "open " | grep "^[0-9]" | cut -d "/" -f 1 | tr "\n" "," | sed "s/,$//")"
+  ports="${ports}","${udp_ports}"
 
   # Check whether there are ports in the var
   if [ -z "$ports" ]; then
@@ -374,17 +376,13 @@ tomcat_enumeration() {
 cidr_enumeration() {
   # First arg target CIDR, second arg dir
   if [ -n "$cidr" ]; then
+    if [ "$verbose" -eq 1 ]; then printf "%b[+]%b -r%b flag detected. Proceeding to scan CIDR range with dedicated range enumeration tools.\n%b" "${GREEN}" "${YELLOW}" "${GREEN}" "${RESTORE}"; fi
+    
     # Create dir for output
     cidr_dir="${1}$(echo "$cidr" | sed -e 's/\//_/1')_range_enum/"
     custom_mkdir "$cidr_dir"
     
     # Run range tools
-    if [ "$verbose" -eq 1 ]; then printf "%b[+]%b -r%b flag detected. Proceeding to scan CIDR range with dedicated range enumeration tools.\n%b" "${GREEN}" "${YELLOW}" "${GREEN}" "${RESTORE}"; fi
-    
-    running_tool "netdiscover"
-    netdiscover -r "$cidr" >> "${cidr_dir}"netdiscover.out 2>&1 && \
-      finished_tool "netdiscover" "$cidr" "${cidr_dir}netdiscover.out" &
-
     running_tool "nbtscan-unixwiz" 
     nbtscan-unixwiz -f "$cidr" >> "${cidr_dir}"nbtscan-unixwiz.out 2>&1 && \
       finished_tool "nbtscan-unixwiz" "$cidr" "${cidr_dir}nbtscan-unixwiz.out" &
@@ -906,14 +904,13 @@ main() {
     if [ "$verbose" -eq 1 ]; then print_phase 2; fi
     printf "%b[+] Using %b'%s'%b as targets file\n[+] Successfully identified %b'%s'%b targets in the file\n" "${GREEN}" "${RESTORE}" "${IP}" "${GREEN}" "${RESTORE}" "${list_total_lines}" "${GREEN}"
 
-    if [ "$verbose" -eq 1 ]; then print_phase 33; fi
-    
     # loop through the targets and assign vars accordingly
+    if [ "$verbose" -eq 1 ]; then print_phase 33; fi
     line=1
-    if [ "$verbose" -eq 1 ]; then printf ""; fi
+    
     while [ "$line" -le "$list_total_lines" ]; do
       target=$(sed "${line}q;d" "$IP" 2>/dev/null)
-      printf "%b[DEBUG] Using target %s%b\n" "${BLUE}" "$(sed "${line}q;d" "$IP")" "${RESTORE}"
+      # printf "%b[DEBUG] Using target %s%b\n" "${BLUE}" "$(sed "${line}q;d" "$IP")" "${RESTORE}"
       # target_number="_target_${line}"
       dir="${DIR}${target}/"; custom_mkdir "${dir}"
       
@@ -940,6 +937,7 @@ main() {
       fi
 
       # Loop counter
+      printf "%b[+] Target '%b%s%b/%b%s%b': '%b%s%b' successfully enumerated.\n\n%b" "${GREEN}" "${RESTORE}" "${line}" "${GREEN}" "${RESTORE}" "$list_total_lines" "${GREEN}" "${RESTORE}" "$target" "${GREEN}" "${RESTORE}"
       line=$(( line + 1 ))
     done
   fi

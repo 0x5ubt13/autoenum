@@ -29,20 +29,26 @@ compatible_distro=$(cat /etc/*-release | grep -i "debian")
 if [ -n "$compatible_distro" ]; then
   printf "%b[+] Debian-like distro successfully detected. Updating apt-get's cache...%b\n" "${GREEN}" "${RESTORE}"
   sudo apt-get update >/dev/null
+  
 
   # Rustscan
   rustscan_check=$(find / rustscan 2>/dev/null | grep /bin/rustscan)
   if [ -n "$rustscan_check" ]; then
-    # Homebrew (for rustscan)
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-    # Bind brew to shell
-    if [ "$SHELL" = /usr/bin/zsh ]; then rc="${HOME}/.zshrc"; else rc="${HOME}/.bashrc"; fi
-    printf "\neval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"" >> "$rc"
-
-    # Install Rustscan with brew
-    printf "%b[+] Installing %s...%b\n" "${GREEN}" "Rustscan" "${RESTORE}"
-    /home/linuxbrew/.linuxbrew/bin/brew install rustscan >/dev/null
+    sure=$(read -r "Are you sure you want to install Homebrew + Rustscan? (y/n)")
+    if [ "$sure" = "y" ]; then
+      # Homebrew (for rustscan)
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  
+      # Bind brew to shell
+      if [ "$SHELL" = /usr/bin/zsh ]; then rc="${HOME}/.zshrc"; else rc="${HOME}/.bashrc"; fi
+      printf "\neval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"" >> "$rc"
+  
+      # Install Rustscan with brew
+      printf "%b[+] Installing %s...%b\n" "${GREEN}" "Rustscan" "${RESTORE}"
+      /home/linuxbrew/.linuxbrew/bin/brew install rustscan >/dev/null
+    else
+      printf "%b[!] You chose not to install Homebrew + Rustscan%b" "${YELLOW}" "${RESTORE}"
+    fi
   else
     printf "%b[+] Rustscan detected as installed.%b\n" "${GREEN}" "${RESTORE}"
   fi
