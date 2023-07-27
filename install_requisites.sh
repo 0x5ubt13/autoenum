@@ -29,7 +29,6 @@ compatible_distro=$(cat /etc/*-release | grep -i "debian")
 if [ -n "$compatible_distro" ]; then
   printf "%b[+] Debian-like distro successfully detected. Updating apt-get's cache...%b\n" "${GREEN}" "${RESTORE}"
   sudo apt-get update >/dev/null
-  
 
   # Rustscan
   rustscan_check=$(find / rustscan 2>/dev/null | grep /bin/rustscan)

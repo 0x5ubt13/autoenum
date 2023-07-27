@@ -100,9 +100,9 @@ There are other checks involved, like the presence of `locate`, which should cov
 To run the installer, copy & paste the following:
 
 ~~~sh
-git clone https://github.com/0x5ubt13/myToolkit.git
-chmod +x mytoolkit/autoEnum/autoEnum
-cd mytoolkit/autoEnum/
+git clone https://github.com/0x5ubt13/autoenum.git
+chmod +x autoenum/autoEnum
+cd autoEnum/
 ./install_requisites.sh
 ~~~
 
