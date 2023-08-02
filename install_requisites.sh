@@ -8,7 +8,7 @@ YELLOW="\033[33m"
 
 # ---------- Installation ----------
 # Making sure we're not SU
-if [ "$EUID" -eq 0 ]; then 
+if [ "$EUID" -eq 0 ]; then
   printf "%b[-]%b Please don't run this script as root 💀, sudo will only be used to install stuff when strictly necessary.\n" "${RED}" "${RESTORE}"
   exit 1
 fi
@@ -28,21 +28,26 @@ install() {
 compatible_distro=$(cat /etc/*-release | grep -i "debian")
 if [ -n "$compatible_distro" ]; then
   printf "%b[+] Debian-like distro successfully detected. Updating apt-get's cache...%b\n" "${GREEN}" "${RESTORE}"
-  sudo apt-get update >/dev/null  
+  sudo apt-get update >/dev/null
 
   # Rustscan
   rustscan_check=$(find / rustscan 2>/dev/null | grep /bin/rustscan)
   if [ -n "$rustscan_check" ]; then
-    # Homebrew (for rustscan)
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    
-    # Bind brew to shell
-    if [ "$SHELL" = /usr/bin/zsh ]; then rc="${HOME}/.zshrc"; else rc="${HOME}/.bashrc"; fi
-    printf "\neval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"" >> "$rc"
-
-    # Install Rustscan with brew
-    printf "%b[+] Installing %s...%b\n" "${GREEN}" "Rustscan" "${RESTORE}"
-    /home/linuxbrew/.linuxbrew/bin/brew install rustscan >/dev/null
+    sure=$(read -r "Are you sure you want to install Homebrew + Rustscan? (y/n)")
+    if [ "$sure" = "y" ]; then
+      # Homebrew (for rustscan)
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  
+      # Bind brew to shell
+      if [ "$SHELL" = /usr/bin/zsh ]; then rc="${HOME}/.zshrc"; else rc="${HOME}/.bashrc"; fi
+      printf "\neval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\"" >> "$rc"
+  
+      # Install Rustscan with brew
+      printf "%b[+] Installing %s...%b\n" "${GREEN}" "Rustscan" "${RESTORE}"
+      /home/linuxbrew/.linuxbrew/bin/brew install rustscan >/dev/null
+    else
+      printf "%b[!] You chose not to install Homebrew + Rustscan%b" "${YELLOW}" "${RESTORE}"
+    fi
   else
     printf "%b[+] Rustscan detected as installed.%b\n" "${GREEN}" "${RESTORE}"
   fi
@@ -57,6 +62,7 @@ if [ -n "$compatible_distro" ]; then
   install seclists
   install cewl
   install wafW00f
+  install fping
 
   # Symlink autoEnum
   chmod +x ./autoEnum
@@ -67,4 +73,4 @@ if [ -n "$compatible_distro" ]; then
   autoenum -h
 else
   printf "%b[-] Debian-like distro NOT detected. Aborting...%b\n%b[!] To run autoEnum fast, simply make sure you have installed Seclists and Rustscan. Some ports won't be covered, like 1521, but the majority will be enumerated!%b\n" "${RED}" "${RESTORE}" "${YELLOW}" "${RESTORE}"
-fi    
+fi

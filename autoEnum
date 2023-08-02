@@ -8,7 +8,6 @@ YELLOW="\033[33m"
 BLUE="\033[34m"
 START="$(date +%s)" # Timing the execution
 
-
 # ---------- Optional Arguments ----------
 
 # Defaults:
@@ -36,7 +35,6 @@ while getopts "abd:hp:qr:st:" flag; do
 done
 shift $((OPTIND-1))
 
-
 # ---------- Utility Functions ----------
 
 # Print usage and exit
@@ -46,7 +44,7 @@ usage() {
   printf "%b\t-b:%b Bruteforce - Activate all fuzzing and bruteforcing in the script.\n" "${YELLOW}" "${RESTORE}"
   printf "%b\t-d:%b DNS        - Specify custom DNS servers. Default option: %b-n%b.\n" "${YELLOW}" "${RESTORE}" "${YELLOW}" "${RESTORE}"
   printf "%b\t-h:%b Help       - Display this help and exit.\n" "${YELLOW}" "${RESTORE}"
-  printf "%b\t-p:%b top Ports  - Run port sweep with nmap and the flag %b--top-ports=%b<your input>\n" "${YELLOW}" "${RESTORE}" "${YELLOW}" "${RESTORE}"
+  printf "%b\t-p:%b Top Ports  - Run port sweep with nmap and the flag %b--top-ports=%b<your input>\n" "${YELLOW}" "${RESTORE}" "${YELLOW}" "${RESTORE}"
   printf "%b\t-q:%b Quiet      - Don't print the cool banner and decrease overall verbosity.\n" "${YELLOW}" "${RESTORE}"
   printf "%b\t-r:%b Range      - Specify a CIDR range to use tools for whole subnets.\n" "${YELLOW}" "${RESTORE}" 
   printf "%b\t-s:%b Slower     - Don't use Rustscan for the initial port sweep.\n" "${YELLOW}" "${RESTORE}"
@@ -139,7 +137,7 @@ print_phase() {
   1)
     printf "%s%b%s" "1" "${RESTORE}" ": parsing the CIDR range ";;
   2)
-    printf "%s%b%s" "2" "${RESTORE}" ": parsing target or targets list ";;
+    printf "%s%b%s" "2" "${RESTORE}" ": parsing target or list of targets ";;
   3)
     printf "%s%b%s" "3" "${RESTORE}" ": parsing found ports ";;
   33)
@@ -223,6 +221,7 @@ print_hulk() {
 
 # Quickly scan all TCP ports and save them to $ports
 ports_sweep() {
+  ports="" # Reset ports var in case it was used for multi-target, to avoid corruption
   # First arg target IP, second arg dir
   if [ ! "$dnsServers" = "-n" ]; then
     # Nmap ports sweep with --dns-servers
@@ -252,14 +251,14 @@ ports_sweep() {
       if [ $slower -eq 1 ]; then
         # Nmap ports sweep
         printf "%b[+] %b-s%b flag detected. Running port sweep with Nmap%b\n" "${GREEN}" "${BLUE}" "${GREEN}" "${RESTORE}"
-        if [ "$verbose" -eq 1 ]; then printf "%b[+] Starting nmap SYN port discovery scan against %b'%s'%b...\n" "${YELLOW}" "${RESTORE}" "$1" "${YELLOW}"; fi
+        if [ "$verbose" -eq 1 ]; then printf "%b[!] Starting nmap SYN port discovery scan against %b'%s'%b...\n" "${YELLOW}" "${RESTORE}" "$1" "${YELLOW}"; fi
           ports=$(nmap --min-rate=2000 -sS -p- -T5 "$ping" "$1" 2>/dev/null | grep "^[0-9]" | cut -d "/" -f 1 | tr "\n" "," | sed "s/,$//")
       else
         rustscan_check=$(locate "/bin/rustscan" -l 1)
         if [ -n "$rustscan_check" ]; then
           # Rustscan ports sweep
           printf "%b[+] %bRustscan%b found, proceeding to sweep ports with Rustscan%b\n" "${GREEN}" "${BLUE}" "${GREEN}" "${RESTORE}"
-          if [ "$verbose" -eq 1 ]; then printf "\n%b[!] Starting %bRustscan's%b SYN port discovery scan against %b'%s'%b, please bear with...\n" "${YELLOW}" "${BLUE}" "${YELLOW}" "${RESTORE}" "$1" "${YELLOW}"; fi
+          if [ "$verbose" -eq 1 ]; then printf "\n%b[!] Starting %bRustscan's%b SYN port discovery scan against %b'%s'%b, please bear with...\n%b" "${YELLOW}" "${BLUE}" "${YELLOW}" "${RESTORE}" "$1" "${YELLOW}" "${RESTORE}"; fi
           ports="$(rustscan -a "$IP" "$dnsServers" --ulimit 5000 -g | cut -d ' ' -f 3 | sed 's/[^[:alnum:],\t]//g')"
         else
           # Nmap ports sweep
@@ -273,7 +272,8 @@ ports_sweep() {
   
   # Add and merge to ports an UDP scan.
   # TODO: only currently supporting the scan of SNMP and IPMI. More to add, dependant on how much time scanning UDP will consume
-  ports="$ports","$(nmap --min-rate=2000 -sU -p161,162,10161,10162,623 -T5 --open "$ping" "$1" 2>/dev/null | grep "open " | grep "^[0-9]" | cut -d "/" -f 1 | tr "\n" "," | sed "s/,$//")"
+  udp_ports="$(nmap --min-rate=2000 -sU -p161,162,10161,10162,623 -T5 --open "$ping" "$1" 2>/dev/null | grep "open " | grep "^[0-9]" | cut -d "/" -f 1 | tr "\n" "," | sed "s/,$//")"
+  ports="${ports}","${udp_ports}"
 
   # Check whether there are ports in the var
   if [ -z "$ports" ]; then
@@ -377,17 +377,13 @@ tomcat_enumeration() {
 cidr_enumeration() {
   # First arg target CIDR, second arg dir
   if [ -n "$cidr" ]; then
+    if [ "$verbose" -eq 1 ]; then printf "%b[+]%b -r%b flag detected. Proceeding to scan CIDR range with dedicated range enumeration tools.\n%b" "${GREEN}" "${YELLOW}" "${GREEN}" "${RESTORE}"; fi
+    
     # Create dir for output
     cidr_dir="${1}$(echo "$cidr" | sed -e 's/\//_/1')_range_enum/"
     custom_mkdir "$cidr_dir"
     
     # Run range tools
-    if [ "$verbose" -eq 1 ]; then printf "%b[+]%b -r%b flag detected. Proceeding to scan CIDR range with dedicated range enumeration tools.\n%b" "${GREEN}" "${YELLOW}" "${GREEN}" "${RESTORE}"; fi
-    
-    running_tool "netdiscover"
-    netdiscover -r "$cidr" >> "${cidr_dir}"netdiscover.out 2>&1 && \
-      finished_tool "netdiscover" "$cidr" "${cidr_dir}netdiscover.out" &
-
     running_tool "nbtscan-unixwiz" 
     nbtscan-unixwiz -f "$cidr" >> "${cidr_dir}"nbtscan-unixwiz.out 2>&1 && \
       finished_tool "nbtscan-unixwiz" "$cidr" "${cidr_dir}nbtscan-unixwiz.out" &
@@ -399,8 +395,29 @@ cidr_enumeration() {
     running_tool "onesixtyone"
     onesixtyone -c "$(locate "SNMP/snmp.txt" -l 1)" "$cidr" -w 100 >> "${cidr_dir}"onesixtyone.out 2>&1 && \
       finished_tool "onesixtyone" "$cidr" "${cidr_dir}onesixtyone.out" &
+
+    running_tool "fping"
+    fping -asgq "$cidr" >> "${cidr_dir}"fping.out 2>&1 && \
+      finished_tool "fping" "$cidr" "${cidr_dir}fping.out" &
+    
+    # Very fun wee module to detect quite low hanging fruit
+    running_tool "Metasploit scan module for EternalBlue"
+    msfconsole -q -x "use use scanner/smb/smb_ms17_010;set rhosts ${cidr};set threads 10;run;exit" >> "${cidr_dir}"eternalblue_sweep.out 2>&1 && \
+      finished_tool "Metasploit module for EternalBlue" "${1}" "-R ${cidr_dir}eternalblue_sweep.out" && \
+      post_eternalblue_sweep_check &
   else
     printf "%b[!] CIDR range %bNOT%b detected. Remember you can also pass a range in CIDR notation to use enum tools that scan a wide range with '%bautoenum -r <IP address>/<network mask>%b'%b\n" "${YELLOW}" "${RED}" "${YELLOW}" "${BLUE}" "${YELLOW}" "${RESTORE}" 
+  fi
+}
+
+post_eternalblue_sweep_check() {
+  if [ -n "$cidr_dir" ]; then
+    if grep -qi "likely" "${cidr_dir}eternalblue_sweep.out"; then 
+      grep -i "likely" "${cidr_dir}eternalblue_sweep.out" > "${cidr_dir}eternalblue_confirmed.txt" && \
+        printf "%b[+] Positive Match! IPs vulnerable to EternalBlue!\n\tShortcut: '%bless -R %s%b'%b\n" "${GREEN}" "${YELLOW}" "${cidr_dir}eternalblue_confirmed.txt" "${GREEN}" "${RESTORE}"
+    else
+      printf "%b[-]%b No matches <- Metasploit module for EternalBlue\n" "${RED}" "${RESTORE}"
+    fi
   fi
 }
 
@@ -466,6 +483,18 @@ ports_iterator() {
       running_tool "Nmap scripts for DNS"
       nmap -n -p53 --script "(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport" "$1" -v >> "${dns_dir}"dns_nmap_scan.out 2>&1 && \
         finished_tool "Nmap scripts for DNS" "${1}" "${dns_dir}dns_nmap_scan.out" &
+      ;;
+    79)
+      printf "%b[+] Finger service detected. Running Finger enum scripts.%b\n" "${GREEN}" "${RESTORE}"
+      finger_dir="${dir}finger/"; custom_mkdir "$finger_dir"
+
+      running_tool "Nmap scripts for Finger"
+      nmap -n -p79 -sVC "$1" -v >> "${finger_dir}"finger_nmap_scan.out 2>&1 && \
+        finished_tool "Nmap scripts for Finger" "${1}" "${finger_dir}finger_nmap_scan.out" &
+
+      running_tool "Metasploit module for Finger users"
+      msfconsole -q -x "use use auxiliary/scanner/finger/finger_users;set rhost ${1};run;exit" >> "${finger_dir}"finger_metasploit_user_enum.out 2>&1 && \
+        finished_tool "Metasploit module for Finger users" "${1}" "${finger_dir}finger_metasploit_user_enum.out" &
       ;;
     80|443|8080)
       # Create dir for HTTP and get wordlists
@@ -555,6 +584,16 @@ ports_iterator() {
         wp_enumeration "${1}" "8080" "${http_dir}" 
         tomcat_enumeration "${1}"
       fi 
+      ;;
+    88)
+      printf "%b[+] Kerberos service detected. Running SSH nmap enum scripts.%b\n" "${GREEN}" "${RESTORE}"
+      kerberos_dir="${dir}kerberos/"; custom_mkdir "$kerberos_dir"
+
+      running_tool "Nmap scripts for Kerberos"
+      nmap -n -p88 -sCV "$1" -v >> "${kerberos_dir}"kerberos_nmap_scan.out 2>&1 && \
+        finished_tool "Nmap scripts for kerberos" "${1}" "${kerberos_dir}kerberos_nmap_scan.out" &
+
+      printf "Potential DC found. Enumerate further.\nGet the name of the domain and chuck it to:\n\tnmap -p 88 --script=krb5-enum-users --script-args krb5-enum-users.realm=\"{Domain_Name}\" \\\n,userdb={Big_Userlist} \\\n{IP}" > "${kerberos_dir}potential_DC_commands.txt"
       ;;
     110|143|993|995)
       if [ ! -d "${dir}imap_pop3/" ]; then
@@ -802,7 +841,7 @@ ports_iterator() {
           grep "/" < "${nfs_dir}"showmount.out | cut -d " " -f1 | while IFS= read -r dir_to_mount
           do
             custom_mkdir "${nfs_dir}mounted_NFS_contents/${dir_to_mount}/"
-            mount -t nfs "${1}":/"${dir_to_mount}" "${nfs_dir}"mounted_NFS_contents/ -o nolock
+            mount -t nfs "${1}":/"${dir_to_mount}" "${nfs_dir}"mounted_NFS_contents/ -o nolock,vers=3,tcp,timeo=300 # TODO: check these mount options work fine
           done && \
           tree "${nfs_dir}"mounted_NFS_contents/ >> "${nfs_dir}nfs_mounts.tree" 2>&1 && \
           finished_tool "Showmount + mount" "${1}" "${nfs_dir}showmount.out && cat ${nfs_dir}nfs_mounts.tree" && \
@@ -851,7 +890,8 @@ ports_iterator() {
         fi
       fi
       ;;
-  # 554|8554)
+  # TODO:
+  #  554|8554)
   #  hydra
   #  ;;
   # To add:
@@ -866,7 +906,6 @@ ports_iterator() {
   done
   printf "%b[+] Done! All well-known ports included in the script successfully parsed for %b%s%b.\n%b" "${GREEN}" "${RESTORE}" "${1}" "${GREEN}" "${RESTORE}"
 }
-
 
 # ---------- Let the fun begin! MAIN Function ----------
 
@@ -898,21 +937,20 @@ main() {
     if [ "$verbose" -eq 1 ]; then print_phase 3; fi
     all_ports_vuln_scan "${IP}" "${dir}"
 
-    # Iterate over each port in the array
+    # Iterate over each port in the arrayD
     ports_iterator "${IP}" "${dir}" ## TODO: convert ports_iterator to POSIX
   else # ---------- Multi-target: ----------
     # TODO: test thoroughly
     if [ "$verbose" -eq 1 ]; then print_phase 2; fi
     printf "%b[+] Using %b'%s'%b as targets file\n[+] Successfully identified %b'%s'%b targets in the file\n" "${GREEN}" "${RESTORE}" "${IP}" "${GREEN}" "${RESTORE}" "${list_total_lines}" "${GREEN}"
 
-    if [ "$verbose" -eq 1 ]; then print_phase 33; fi
-    
     # loop through the targets and assign vars accordingly
+    if [ "$verbose" -eq 1 ]; then print_phase 33; fi
     line=1
-    if [ "$verbose" -eq 1 ]; then printf ""; fi
+    
     while [ "$line" -le "$list_total_lines" ]; do
       target=$(sed "${line}q;d" "$IP" 2>/dev/null)
-      printf "%b[DEBUG] Using target %s%b\n" "${BLUE}" "$(sed "${line}q;d" "$IP")" "${RESTORE}"
+      # printf "%b[DEBUG] Using target %s%b\n" "${BLUE}" "$(sed "${line}q;d" "$IP")" "${RESTORE}"
       # target_number="_target_${line}"
       dir="${DIR}${target}/"; custom_mkdir "${dir}"
       
@@ -939,6 +977,7 @@ main() {
       fi
 
       # Loop counter
+      printf "%b[+] Target '%b%s%b/%b%s%b': '%b%s%b' successfully enumerated.\n\n%b" "${GREEN}" "${RESTORE}" "${line}" "${GREEN}" "${RESTORE}" "$list_total_lines" "${GREEN}" "${RESTORE}" "$target" "${GREEN}" "${RESTORE}"
       line=$(( line + 1 ))
     done
   fi
@@ -947,7 +986,6 @@ main() {
 # ---------- End of function declarations ----------
 
 # ---------- Script checks, ensuring everything is ready to run ----------
-
 checks
 
 # ---------- Preliminary checks completed. Starting engines! Calling main function ----------

@@ -17,47 +17,53 @@ This tool is still in its early days, and comes with absolutely no guarantee. Pl
 Give it either a single IP address or a file containing a list of IPs, a name to use for the output files, sit back, and relax:
 
 ~~~txt
-./autoEnum -h
+┌──(kali㉿SubtleLabs)-[~]
+└─$ autoenum -h             
 
-              _____      __________                         
-______ ____  ___  /_________  ____/__________  ________ ___ 
-_  __ `/  / / /  __/  __ \_  __/  __  __ \  / / /_  __ `__ \
-/ /_/ // /_/ // /_ / /_/ /  /___  _  / / / /_/ /_  / / / / /
-\__,_/ \__,_/ \__/ \____//_____/  /_/ /_/\__,_/ /_/ /_/ /_/ 
-                    by 0x5ubt13                             
-   
-Usage: autoenum [OPTIONS] -t <Single target's IP / Targets file>
-	-a: Again      - Repeat the scan and compare with initial ports discovered.
-	-b: Bruteforce - Activate all fuzzing and bruteforcing in the script.
-	-d: DNS        - Specify custom DNS servers. Default option: -n.
-	-h: Help       - Display this help and exit.
-	-p: top Ports  - Run port sweep with nmap and the flag --top-ports=<your input>
-	-q: Quiet      - Don't print the cool banner and decrease overall verbosity.
-	-r: Range      - Specify a CIDR range to use tools for whole subnets.
-	-s: Slower     - Don't use Rustscan for the initial port sweep.
-	-t: Target     - Specify target single IP / List of IPs file.
+             _____      __________                         
+______ ____ ___  /_________  ____/_________  ________ ___ 
+_  __ ` / / / /  __/  __ \_  __/ __  __ \  / / /_  __ `__ \
+/ /_/ // /_/ // /_ / /_/ /  /___ _  / / / /_/ /_  / / / / /
+\__,_/ \__,_/ \__/ \____//_____/ /_/ /_/\__,_/ /_/ /_/ /_/ 
+                    by 0x5ubt13                               
+                                            
+
+[*] ---------- Starting Phase 0: running initial checks ----------
+
+[*] Help flag detected. Aborting other checks and printing usage.
+
+Usage: autoenum [OPTIONS] -t <Single target's IP/Targets file>
+    -a: Again      - Repeat the scan and compare with initial ports discovered.
+    -b: Bruteforce - Activate all fuzzing and bruteforcing in the script.
+    -d: DNS        - Specify custom DNS servers. Default option: -n.
+    -h: Help       - Display this help and exit.
+    -p: Top Ports  - Run port sweep with nmap and the flag --top-ports=<your input>
+    -q: Quiet      - Don't print the cool banner and decrease overall verbosity.
+    -r: Range      - Specify a CIDR range to use tools for whole subnets.
+    -s: Slower     - Don't use Rustscan for the initial port sweep.
+    -t: Target     - Specify target single IP / List of IPs file.
 
 Examples:
-	autoenum -t 192.168.142.93
-	autoenum -qa -t 192.168.142.93
-	autoenum -t 10.129.121.60 -d <serv1[,serv2],...>
-	autoenum -r 10.129.121.0/24 -t 10.129.121.60 
-	autoenum -t targets_file.txt -r 10.10.8.0/24 
+    autoenum -t 192.168.142.93
+    autoenum -qa -t 192.168.142.93
+    autoenum -t 10.129.121.60 -d <serv1[,serv2],...>
+    autoenum -t 10.129.121.60 -r 10.129.121.0/24
+    autoenum -t targets_file.txt -r 10.10.8.0/24
 ~~~
 
-## 29 wrapped tools currently present
+## Wrapped tools currently present
 
 - Braa
 - CeWL
 - CrackMapExec
 - Enum4linux
 - Ffuf
+- Fping
 - Gobuster
 - Hydra
 - Ident-user-enum
 - Metasploit
 - Nbtscan-unixwiz
-- Netdiscover
 - Nikto
 - Nmap
 - Nmblookup
@@ -77,7 +83,7 @@ Examples:
 - WhatWeb
 - WafW00f
 
-And many more doing magic tricks behind the scenes!!
+Apart from the above 29 tools, there are many more included in GNU/Linux doing magic tricks behind the scenes!!
 
 ## Tools yet to implement
 
@@ -94,13 +100,13 @@ There are other checks involved, like the presence of `locate`, which should cov
 To run the installer, copy & paste the following:
 
 ~~~sh
-git clone https://github.com/0x5ubt13/myToolkit.git
-chmod +x mytoolkit/autoEnum/autoEnum
-cd mytoolkit/autoEnum/
+git clone https://github.com/0x5ubt13/autoenum.git
+chmod +x autoenum/autoEnum
+cd autoEnum/
 ./install_requisites.sh
 ~~~
 
-## Why Bash, and the 'Slow' flag
+## Why Bash; and the 'Slow' flag
 The way this script works is it first sweeps all open TCP ports, then sweeps some hard-coded UDP ports, and only then, launches the global `Nmap` attack and parses all open ports.
 
 This is clearly the bottleneck of the script, accounting pretty much for the 95% of its running time, and the reason why Bash was chosen over Python or Golang: there's not much point in trying to speed it up if it's going to depend upon the port sweeping to do the logic afterwards anyway.
@@ -119,11 +125,13 @@ In jobs that would normally use VA scanners like `Nessus`, a minute of your time
 - [x] Adapt to Google's shell scripting style guide
 - [x] Implement sending notifications when tools have finished on background
 - [x] Hide many of the notifications behind an optional verbose flag
-- [ ] Finish the core script
+- [x] Finish the core script
+- [ ] Implement more utility flags
 - [ ] Test thoroughly
-- [ ] Link each wrapped tool on README to their repos
+- [ ] Link each wrapped tool on README to their official repos
 - [ ] Containerise
 - [ ] Improve the way output is presented to terminal
+- [ ] Improve README.md to show all protocols the script enumerates
 - [ ] Convert to POSIX compliant
 - [ ] Add MOAR enum tools
 - [ ] Enumerate all things (legally!)
