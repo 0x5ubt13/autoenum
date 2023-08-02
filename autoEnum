@@ -173,6 +173,8 @@ checks() {
   else
     error_msg "You must provide an IP address or targets file with the flag -t to start the attack."
   fi
+
+  # TODO: check targets file exists.
   
   # Check 4: Determine whether it is a single target or multi-target
   if [[ ! -f "$IP" ]]; then # Single target
