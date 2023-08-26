@@ -106,6 +106,11 @@ cd autoEnum/
 ./install_requisites.sh
 ~~~
 
+## Update: porting tool to Go
+Although in the next section I reflect on why Bash was initially chosen over Python or Go, I've decided it's time to prove myself and try to compile this tool into a nice, fast, concurrent binary that takes full advantage of the nice features Golang has to offer! :)
+
+You can see the porting process and updates here: [Enumeraga](https://github.com/0x5ubt13/enumeraga)
+
 ## Why Bash; and the 'Slow' flag
 The way this script works is it first sweeps all open TCP ports, then sweeps some hard-coded UDP ports, and only then, launches the global `Nmap` attack and parses all open ports.
 
