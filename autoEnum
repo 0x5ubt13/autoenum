@@ -678,7 +678,7 @@ ports_iterator() {
         smbmap -H "${1}" >> "${nb_smb_dir}smbmap_anon.out" 2>&1 && \
           finished_tool "SMBMap" "${1}" "${nb_smb_dir}smbmap_anon.out" &
   
-        running_tool "NBLookup"
+        running_tool "NMBLookup"
         nmblookup -A "${1}" >> "${nb_smb_dir}nmblookup.out" 2>&1 && \
           finished_tool "NMBLookup" "${1}" "${nb_smb_dir}nmblookup.out" &
     
